@@ -131,9 +131,6 @@ void panic(const char *fmt, ...)
 	 */
 	crash_kexec(NULL);
 
-	/* Store crash context for all other no panic cpus */
-	crash_notes_save_cpus();
-
 	/*
 	 * Note smp_send_stop is the usual smp shutdown function, which
 	 * unfortunately means it may not be hardened to work in a panic
@@ -142,6 +139,9 @@ void panic(const char *fmt, ...)
 	smp_send_stop();
 
 	kmsg_dump(KMSG_DUMP_PANIC);
+
+	if (is_console_locked())
+		console_unlock();
 
 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
 
