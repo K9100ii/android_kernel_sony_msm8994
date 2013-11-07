@@ -49,8 +49,6 @@ struct snd_pcm_substream;
  *	the ring buffer
  * @total_bytes_transferred: cumulative bytes transferred by offload DSP
  * @sleep: poll sleep
- * @wait: drain wait queue
- * @drain_wake: condition for drain wake
  */
 struct snd_compr_runtime {
 	snd_pcm_state_t state;
@@ -63,8 +61,6 @@ struct snd_compr_runtime {
 	u64 total_bytes_transferred;
 	wait_queue_head_t sleep;
 	struct snd_pcm_substream *fe_substream;
-	wait_queue_head_t wait;
-	unsigned int drain_wake;
 	void *private_data;
 };
 
@@ -183,10 +179,11 @@ static inline void snd_compr_fragment_elapsed(struct snd_compr_stream *stream)
 
 static inline void snd_compr_drain_notify(struct snd_compr_stream *stream)
 {
-	snd_BUG_ON(!stream);
+	if (snd_BUG_ON(!stream))
+		return;
 
-	stream->runtime->drain_wake = 1;
-	wake_up(&stream->runtime->wait);
+	stream->runtime->state = SNDRV_PCM_STATE_SETUP;
+	wake_up(&stream->runtime->sleep);
 }
 
 #endif
