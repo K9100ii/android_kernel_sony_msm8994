@@ -2533,14 +2533,6 @@ static int __dwc3_cleanup_done_trbs(struct dwc3 *dwc, struct dwc3_ep *dep,
 			s_pkt = 1;
 	}
 
-	/*
-	 * We assume here we will always receive the entire data block
-	 * which we should receive. Meaning, if we program RX to
-	 * receive 4K but we receive only 2K, we assume that's all we
-	 * should receive and we simply bounce the request back to the
-	 * gadget driver for further processing.
-	 */
-	req->request.actual += req->request.length - count;
 	if (s_pkt)
 		return 1;
 	if ((event->status & DEPEVT_STATUS_LST) &&
@@ -2560,25 +2552,15 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 	struct dwc3_trb		*trb;
 	unsigned int		slot;
 	unsigned int		i;
+	int			count = 0;
 	int			ret;
 
 	do {
 		req = next_request(&dep->req_queued);
 		if (!req) {
-			if (event->status)
-				dev_err(dwc->dev,
-					"%s: evt sts %x for no req queued",
-					dep->name, event->status);
+			WARN_ON_ONCE(1);
 			return 1;
 		}
-
-		/*
-		 * For bulk endpoints, HWO bit may be set when the transfer
-		 * complete timer expires.
-		 */
-		if (usb_endpoint_xfer_bulk(dep->endpoint.desc) &&
-			(req->trb->ctrl & DWC3_TRB_CTRL_HWO))
-			return 0;
 
 		i = 0;
 		do {
@@ -2588,6 +2570,8 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 				slot++;
 			slot %= DWC3_TRB_NUM;
 			trb = &dep->trb_pool[slot];
+			count += trb->size & DWC3_TRB_SIZE_MASK;
+
 
 			ret = __dwc3_cleanup_done_trbs(dwc, dep, req, trb,
 					event, status);
@@ -2595,17 +2579,14 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 				break;
 		}while (++i < req->request.num_mapped_sgs);
 
-		if (req->ztrb) {
-			trb = req->ztrb;
-			if ((event->status & DEPEVT_STATUS_LST) &&
-				(trb->ctrl & (DWC3_TRB_CTRL_LST |
-					DWC3_TRB_CTRL_HWO)))
-				ret = 1;
-
-			if ((event->status & DEPEVT_STATUS_IOC) &&
-					(trb->ctrl & DWC3_TRB_CTRL_IOC))
-				ret = 1;
-		}
+		/*
+		 * We assume here we will always receive the entire data block
+		 * which we should receive. Meaning, if we program RX to
+		 * receive 4K but we receive only 2K, we assume that's all we
+		 * should receive and we simply bounce the request back to the
+		 * gadget driver for further processing.
+		 */
+		req->request.actual += req->request.length - count;
 		dwc3_gadget_giveback(dep, req, status);
 
 		/* EP possibly disabled during giveback? */
