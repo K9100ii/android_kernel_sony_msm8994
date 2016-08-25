@@ -2150,17 +2150,20 @@ static void rmnet_ipa_get_stats_and_update(bool reset)
 
 	rc = ipa_qmi_get_data_stats(&req, resp);
 
-	if (!rc) {
-		memset(&msg_meta, 0, sizeof(struct ipa_msg_meta));
-		msg_meta.msg_type = IPA_TETHERING_STATS_UPDATE_STATS;
-		msg_meta.msg_len =
-			sizeof(struct ipa_get_data_stats_resp_msg_v01);
-		rc = ipa_send_msg(&msg_meta, resp, rmnet_ipa_free_msg);
-		if (rc) {
-			IPAWANERR("ipa_send_msg failed: %d\n", rc);
-			kfree(resp);
-			return;
-		}
+	if (rc) {
+		IPAWANERR("ipa_qmi_get_data_stats failed: %d\n", rc);
+		kfree(resp);
+		return;
+	}
+
+	memset(&msg_meta, 0, sizeof(struct ipa_msg_meta));
+	msg_meta.msg_type = IPA_TETHERING_STATS_UPDATE_STATS;
+	msg_meta.msg_len = sizeof(struct ipa_get_data_stats_resp_msg_v01);
+	rc = ipa_send_msg(&msg_meta, resp, rmnet_ipa_free_msg);
+	if (rc) {
+		IPAWANERR("ipa_send_msg failed: %d\n", rc);
+		kfree(resp);
+		return;
 	}
 }
 
@@ -2229,17 +2232,20 @@ static void rmnet_ipa_get_network_stats_and_update(void)
 		(long unsigned int) resp->apn_data_stats_list[0].num_dl_bytes);
 
 
-	if (!rc) {
-		memset(&msg_meta, 0, sizeof(struct ipa_msg_meta));
-		msg_meta.msg_type = IPA_TETHERING_STATS_UPDATE_NETWORK_STATS;
-		msg_meta.msg_len =
-			sizeof(struct ipa_get_apn_data_stats_resp_msg_v01);
-		rc = ipa_send_msg(&msg_meta, resp, rmnet_ipa_free_msg);
-		if (rc) {
-			IPAWANERR("ipa_send_msg failed: %d\n", rc);
-			kfree(resp);
-			return;
-		}
+	if (rc) {
+		IPAWANERR("ipa_qmi_get_network_stats failed %d\n", rc);
+		kfree(resp);
+		return;
+	}
+
+	memset(&msg_meta, 0, sizeof(struct ipa_msg_meta));
+	msg_meta.msg_type = IPA_TETHERING_STATS_UPDATE_NETWORK_STATS;
+	msg_meta.msg_len = sizeof(struct ipa_get_apn_data_stats_resp_msg_v01);
+	rc = ipa_send_msg(&msg_meta, resp, rmnet_ipa_free_msg);
+	if (rc) {
+		IPAWANERR("ipa_send_msg failed: %d\n", rc);
+		kfree(resp);
+		return;
 	}
 }
 
