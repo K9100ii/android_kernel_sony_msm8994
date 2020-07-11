@@ -548,10 +548,8 @@ static inline void __free_one_page(struct page *page,
 	unsigned long page_idx;
 	unsigned long combined_idx;
 	unsigned long uninitialized_var(buddy_idx);
-	struct page *buddy;
-	unsigned int max_order;
-
-	max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
+	struct page *buddy = NULL;
+	int max_order = MAX_ORDER;
 
 	VM_BUG_ON(!zone_is_initialized(zone));
 
@@ -560,20 +558,28 @@ static inline void __free_one_page(struct page *page,
 			return;
 
 	VM_BUG_ON(migratetype == -1);
-	if (likely(!is_migrate_isolate(migratetype)))
+	if (is_migrate_isolate(migratetype)) {
+		/*
+		 * We restrict max order of merging to prevent merge
+		 * between freepages on isolate pageblock and normal
+		 * pageblock. Without this, pageblock isolation
+		 * could cause incorrect freepage accounting.
+		 */
+		max_order = min(MAX_ORDER, pageblock_order + 1);
+	} else {
 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+	}
 
-	page_idx = page_to_pfn(page) & ((1 << MAX_ORDER) - 1);
+	page_idx = page_to_pfn(page) & ((1 << max_order) - 1);
 
 	VM_BUG_ON(page_idx & ((1 << order) - 1));
 	VM_BUG_ON(bad_range(zone, page));
 
-continue_merging:
 	while (order < max_order - 1) {
 		buddy_idx = __find_buddy_index(page_idx, order);
 		buddy = page + (buddy_idx - page_idx);
 		if (!page_is_buddy(page, buddy, order))
-			goto done_merging;
+			break;
 		/*
 		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
 		 * merge with it and move up one order.
@@ -595,33 +601,6 @@ continue_merging:
 		page_idx = combined_idx;
 		order++;
 	}
-	if (max_order < MAX_ORDER) {
-		/* If we are here, it means order is >= pageblock_order.
-		 * We want to prevent merge between freepages on isolate
-		 * pageblock and normal pageblock. Without this, pageblock
-		 * isolation could cause incorrect freepage or CMA accounting.
-		 *
-		 * We don't want to hit this code for the more frequent
-		 * low-order merging.
-		 */
-		if (unlikely(has_isolate_pageblock(zone))) {
-			int buddy_mt;
-
-			buddy_idx = __find_buddy_index(page_idx, order);
-			buddy = page + (buddy_idx - page_idx);
-			buddy_mt = get_pageblock_migratetype(buddy);
-
-			if (migratetype != buddy_mt
-					&& (is_migrate_isolate(migratetype) ||
-					is_migrate_isolate(buddy_mt)))
-				goto done_merging;
-		}
-		max_order++;
-		goto continue_merging;
-	}
-
-done_merging:
-
 	set_page_order(page, order);
 
 	/*
@@ -1179,8 +1158,7 @@ int find_suitable_fallback(struct free_area *area, unsigned int order,
  * as well.
  */
 static void try_to_steal_freepages(struct zone *zone, struct page *page,
-				   int start_type, int fallback_type,
-				   int start_order)
+                                  int start_type, int fallback_type)
 {
         int current_order = page_order(page);
 
@@ -1190,14 +1168,9 @@ static void try_to_steal_freepages(struct zone *zone, struct page *page,
                 return;
         }
 
-	/* don't let unmovable allocations cause migrations simply because of free pages */
-	if ((start_type != MIGRATE_UNMOVABLE && current_order >= pageblock_order / 2) ||
-	    /* only steal reclaimable page blocks for unmovable allocations */
-	    (start_type == MIGRATE_UNMOVABLE && fallback_type != MIGRATE_MOVABLE && current_order >= pageblock_order / 2) ||
-	    /* reclaimable can steal aggressively */
+        if (current_order >= pageblock_order / 2 ||
             start_type == MIGRATE_RECLAIMABLE ||
-	    // allow unmovable allocs up to 64K without migrating blocks
-	    (start_type == MIGRATE_UNMOVABLE && start_order >= 5) ||
+            start_type == MIGRATE_UNMOVABLE ||
             page_group_by_mobility_disabled) {
                 int pages;
 
@@ -1240,7 +1213,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 				area->nr_free_cma--;
 
 			try_to_steal_freepages(zone, page, start_migratetype,
-								migratetype, order);
+								migratetype);
 
 			/* Remove the page from the freelists */
 			list_del(&page->lru);
@@ -6560,7 +6533,6 @@ static const struct trace_print_flags pageflag_names[] = {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	{1UL << PG_compound_lock,	"compound_lock"	},
 #endif
-	{1UL << PG_readahead,           "PG_readahead"  },
 };
 
 static void dump_page_flags(unsigned long flags)

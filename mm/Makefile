@@ -17,8 +17,7 @@ obj-y			:= filemap.o mempool.o oom_kill.o fadvise.o \
 			   util.o mmzone.o vmstat.o backing-dev.o \
 			   mm_init.o mmu_context.o percpu.o slab_common.o \
 			   compaction.o balloon_compaction.o \
-			   interval_tree.o $(mmu-y) \
-			   showmem.o vmpressure.o
+			   interval_tree.o showmem.o list_lru.o $(mmu-y)
 
 obj-y += init-mm.o
 
@@ -66,3 +65,5 @@ obj-$(CONFIG_Z3FOLD)	+= z3fold.o
 obj-$(CONFIG_GENERIC_EARLY_IOREMAP) += early_ioremap.o
 obj-$(CONFIG_ZPOOL)	+= zpool.o
 obj-$(CONFIG_ZSMALLOC)	+= zsmalloc.o
+obj-$(CONFIG_FORCE_RECLAIM)	+= force_reclaim.o
+obj-$(CONFIG_PROCESS_RECLAIM)	+= process_reclaim.o
