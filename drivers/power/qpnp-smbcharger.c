@@ -6721,7 +6721,7 @@ static int smbchg_probe(struct spmi_device *spmi)
 	int rc;
 	struct smbchg_chip *chip;
 	struct power_supply *usb_psy;
-	struct qpnp_vadc_chip *vadc_dev;
+	struct qpnp_vadc_chip *vadc_dev = NULL;
 #ifdef CONFIG_QPNP_SMBCHARGER_EXTENSION
 	bool changed;
 #endif

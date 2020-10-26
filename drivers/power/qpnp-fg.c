@@ -1297,7 +1297,7 @@ static int get_prop_capacity(struct fg_chip *chip)
 {
 	int msoc;
 #ifdef CONFIG_QPNP_FG_EXTENSION
-	int status, voltage_now, capacity = 0;
+	int status = 0, voltage_now, capacity = 0;
 	union power_supply_propval prop = {0,};
 #endif
 
@@ -2202,7 +2202,7 @@ static int estimate_battery_age(struct fg_chip *chip, int *actual_capacity)
 {
 	int64_t ocv_cutoff_new, ocv_cutoff_aged, temp_rs_to_rslow;
 	int64_t esr_actual, battery_esr, val;
-	int soc_cutoff_aged, soc_cutoff_new, rc;
+	int soc_cutoff_aged, soc_cutoff_new, rc = 0;
 	int battery_soc, unusable_soc, batt_temp;
 	u8 buffer[3];
 
@@ -2226,9 +2226,9 @@ static int estimate_battery_age(struct fg_chip *chip, int *actual_capacity)
 	}
 
 	battery_soc = get_battery_soc_raw(chip) * 100 / FULL_PERCENT_3B;
-	if (rc) {
+	if (rc)
 		goto error_done;
-	} else if (battery_soc < 25 || battery_soc > 75) {
+	else if (battery_soc < 25 || battery_soc > 75) {
 		if (fg_debug_mask & FG_AGING)
 			pr_info("Battery SoC (%d) out of range, aborting\n",
 					(int)battery_soc);
@@ -2241,14 +2241,15 @@ static int estimate_battery_age(struct fg_chip *chip, int *actual_capacity)
 	rc |= fg_mem_read(chip, buffer, BATTERY_ESR_REG, 2, 2, 0);
 	battery_esr = half_float(buffer);
 
-	if (rc) {
+	if (rc)
 		goto error_done;
-	} else if (esr_actual < battery_esr) {
+	else if (esr_actual < battery_esr) {
 		if (fg_debug_mask & FG_AGING)
 			pr_info("Batt ESR lower than ESR actual, aborting\n");
 		rc = 0;
 		goto done;
 	}
+
 	rc = fg_mem_read(chip, buffer, TEMP_RS_TO_RSLOW_REG, 2, 0, 0);
 	temp_rs_to_rslow = half_float(buffer);
 
@@ -5564,7 +5565,7 @@ static int fg_hw_init(struct fg_chip *chip)
 static int fg_setup_memif_offset(struct fg_chip *chip)
 {
 	int rc;
-	u8 dig_major;
+	u8 dig_major = 0;
 
 	rc = fg_read(chip, chip->revision, chip->mem_base + DIG_MINOR, 4);
 	if (rc) {
